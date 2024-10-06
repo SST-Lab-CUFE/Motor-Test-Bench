@@ -108,6 +108,7 @@ def arm_clicked():
         arm.itemconfig(armB,outline=green)
     else:
         armed=False
+        Send("0") # Disarm the motor
         arm.itemconfig(toggle_text,text='Not Armed')
         arm.itemconfig(armB,outline=red)
 def set_speed(value):
@@ -119,7 +120,7 @@ def open_speed_window():
     speed_window = tk.Toplevel()
     speed_window.title("Select Speed")
     # Create buttons for 25%, 50%, 75%, and 100%
-    buttons = [("25%", 25), ("50%", 50), ("75%", 75), ("100%", 100)]
+    buttons = [("0%", 0),("25%", 25), ("50%", 50), ("75%", 75), ("100%", 100)]
     for (text, value) in buttons:
         button = tk.Button(speed_window, text=text, command=lambda v=value: set_speed(v))
         button.pack(pady=5)
@@ -132,6 +133,10 @@ def open_speed_window():
     def add_custom_speed():
         try:
             custom_value = float(custom_entry.get())
+            if custom_value < 0:
+                custom_value= -custom_value
+            if custom_value> 100:
+                custom_value=100
             set_speed(custom_value)
         except ValueError:
             print("Please enter a valid number")
@@ -217,11 +222,11 @@ Label1=tk.Label(root,text='SSTL Thrust Test Platform',font="play 18 bold",fg="#0
 Label1.pack()
 Label1.place(x=40,y=40)
 #Thrust
-Label2=tk.Label(root,text=f'Thrust= {Thrust_value} N',font="play 48 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
+Label2=tk.Label(root,text=f'Thrust = {Thrust_value} N',font="play 48 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
 Label2.pack()
 Label2.place(x=450,y=350)
 #Motor Speed
-Label3=tk.Label(root,text=f'Motor Speed= 0 %',font="play 48 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
+Label3=tk.Label(root,text=f'Motor Speed = 0%',font="play 48 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
 Label3.pack()
 Label3.place(x=350,y=250)
 
