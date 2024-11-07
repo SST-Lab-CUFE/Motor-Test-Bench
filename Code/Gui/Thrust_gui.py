@@ -5,6 +5,7 @@ import random
 import keyboard
 import threading
 import pyautogui
+import numpy as np
 import tkinter as tk
 from tkinter import *
 from tkinter import ttk
@@ -167,9 +168,10 @@ def move_cursor():
         b=random.randint(50,200)*random.choice(direction)
         pyautogui.move(a,b,duration=0.105)
 def update_graph(thrust):
-    global t0
+    global t0,x,y,y2
     try:
         y.append(float(thrust))
+        y2.append(float(thrust)*20)
         x.append(time.time() - t0)
     except ValueError:
         print(f"Skipping non-numeric value: {thrust}")
@@ -177,14 +179,55 @@ def update_graph(thrust):
     
     # Plot the new data
     axis.plot(x, y, linestyle="-", color="b", label="Thrust")
+    axis2.plot(x, y2, linestyle="-", color="b", label="Torque")
     
     # Dynamically adjust the y-axis limits
     if y:  # Ensure there are valid y values to set limits
         axis.set_ylim(min(y) - 1, max(y) + 1)  # Adjust the limits as needed
+        axis2.set_ylim(min(y2) - 1, max(y2) + 1)  # Adjust the limits as needed
     
     # Redraw the canvas
     fig1.draw()
+    fig2.draw()
 
+# Create the filename
+def save_readings(data):
+    import datetime
+    now = datetime.datetime.now()
+    timestamp = now.strftime("%y-%m-%d-%H-%M")
+    print(timestamp)
+    filename = f"Thrust-{timestamp}.txt"            
+    with open(filename, "w") as file:
+        file.write("SSTL Thrust Test Platform\n")
+        file.write(f"{data}\n")
+    print(f"File '{filename}' created and values written successfully.")
+
+def debug_shortcuts(event):
+    global  t0
+    global x,y,y2
+    readings=""
+    i=0
+    # Define actions based on the key pressed
+    if event.name == 'space':
+        Send("0")
+        armed=False
+        # make the button show "ARM"
+    if event.name=='g':
+        update_graph(np.sin(random.randint(0,2*180)))
+    if event.name=="s":
+        t0=time.time()
+    if event.name=="l":
+        while i<len(x):
+            readings+=f"Time ={x[i]}, Thrust={y[i]}, Torque={y2[i]}\n"
+            i+=1
+        print(readings)
+        save_readings(readings)
+
+def detect_key_press():
+    # Hook the key press event to the debug_shortcuts function
+    keyboard.on_press(debug_shortcuts)
+#threading.Thread(target=detect_key_press).start()
+detect_key_press()
 
 # GUI WINDOW
 normal_color = "#5b3065" #border
@@ -197,31 +240,45 @@ root=tk.Tk()
 root.title("Thrust Bench")
 root.geometry('1280x720+200+10')
 root.resizable(False, False)
-root.config(bg='#dddddd')
+root.config(bg='#dddddd') # background
 
 #root.iconbitmap(f"{currentDIR}/controller_assets/icon.ico")
 
 #Figures
-figure = Figure(figsize=(3, 2), dpi=200)
-figure.patch.set_facecolor("#001122")
-axis = figure.add_subplot(111)
+Thrust_Figure = Figure(figsize=(3, 2), dpi=200)
+Thrust_Figure.patch.set_facecolor("#dddddd")
+axis = Thrust_Figure.add_subplot(111)
 axis.set_title("Thrust figure")
 axis.set_xlabel("Time")
 axis.set_ylabel("Force")
-axis.set_facecolor("#ffffff")
-axis.tick_params(axis='x', colors='white')  # Change x-axis ticks color
-axis.tick_params(axis='y', colors='white')  # Change y-axis ticks color
-axis.set_title("Thrust", color='white')  # Change title color
+axis.set_facecolor("#dddddd")
+axis.tick_params(axis='x', colors='#001122')  # Change x-axis ticks color
+axis.tick_params(axis='y', colors='#001122')  # Change y-axis ticks color
+axis.set_title("Thrust", color='#001122')  # Change title color
 #axis.legend()
 x = []
 y = []
-fig1 = FigureCanvasTkAgg(figure, root)
+fig1 = FigureCanvasTkAgg(Thrust_Figure, root)
 fig1.get_tk_widget().pack()
-fig1.get_tk_widget().place(x=500,y=150)
-axis.spines['left'].set_color('#ffffff')  # Change left spine color
-axis.spines['bottom'].set_color('#ffffff')  # Change bottom spine color
-axis.spines['right'].set_color('#ffffff')  # Change right spine color
-axis.spines['top'].set_color('#ffffff')  # Change top spine color
+fig1.get_tk_widget().place(x=50,y=150)
+
+#Torque Figure
+Tourqe_Figure = Figure(figsize=(3, 2), dpi=200)
+Tourqe_Figure.patch.set_facecolor("#dddddd")
+axis2 = Tourqe_Figure.add_subplot(111)
+axis2.set_title("Torque figure")
+axis2.set_xlabel("Time")
+axis2.set_ylabel("Torque")
+axis2.set_facecolor("#dddddd")
+axis2.tick_params(axis='x', colors='#001122')  # Change x-axis ticks color
+axis2.tick_params(axis='y', colors='#001122')  # Change y-axis ticks color
+axis2.set_title("Torque ", color='#001122')  # Change title color
+#axis.legend()
+y2 = []
+fig2 = FigureCanvasTkAgg(Tourqe_Figure, root)
+fig2.get_tk_widget().pack()
+fig2.get_tk_widget().place(x=650,y=150)
+
 
 
 
@@ -230,13 +287,14 @@ Label1=tk.Label(root,text='SSTL Thrust Test Platform',font="play 24 bold",fg="#0
 Label1.pack()
 Label1.place(x=40,y=40)
 #Thrust
-Label2=tk.Label(root,text=f'Thrust = {Thrust_value} N',font="play 16 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
+RPM_Value="2948"
+Label2=tk.Label(root,text=f'RPM = {RPM_Value}      press L to log',font="play 16 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
 Label2.pack()
-Label2.place(x=40,y=120)
+Label2.place(x=300,y=100)
 #Motor Speed
 Label3=tk.Label(root,text=f'Motor Speed = 0%',font="play 16 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
 Label3.pack()
-Label3.place(x=40,y=170)
+Label3.place(x=100,y=100)
 
 
 # Serial port picker
