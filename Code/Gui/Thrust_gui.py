@@ -1,13 +1,21 @@
-import time
-import threading
 import os
+import math
+import time
+import random
+import keyboard
+import threading
+import pyautogui
 import tkinter as tk
-from tkinter import ttk
 from tkinter import *
+from tkinter import ttk
 from tkinter import scrolledtext
 from tkinter import simpledialog
-from serial_communicator import Serial_Communications
+from matplotlib.figure import Figure
 from serial_sniffer import serial_ports
+from serial_communicator import Serial_Communications
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+
 
 
 sp=serial_ports()
@@ -21,7 +29,7 @@ Thrust_value=0
 
 
 def connect_clicked():
-    global running,c,Serial
+    global running,c,Serial,t0
     refreshSerialPorts()
     if running==True:
         print('stopped')
@@ -32,6 +40,7 @@ def connect_clicked():
         running = True
         print('started')
         connect.itemconfig(toggle_text,text='COM Started')
+        t0=time.time()
         try:
             COM=SerialPorts.get()
             Serial=Serial_Communications(COM,9600)
@@ -62,13 +71,16 @@ def SerialMonitor():
         root.geometry("1280x905")
         root.after(0, root.update)
         serialThread=threading.Thread(target=SerialMonitorRefresh).start()
-
 def SerialMonitorRefresh():
     global Serial
+    #global t0
     while expanded:
         readings=Serial.read()
         if readings!="":
-            Thrust_Change(readings)
+            Thrust_Title_Change(readings)
+            #if readings!="0":
+                
+            update_graph(readings)
             serial_monitor.insert(tk.END, readings+'\n')
             serial_monitor.see(tk.END)
             
@@ -106,11 +118,13 @@ def arm_clicked():
         ##Change button color
         arm.itemconfig(toggle_text,text='Armed')
         arm.itemconfig(armB,outline=green)
+        print("armed")
     else:
         armed=False
         Send("0") # Disarm the motor
         arm.itemconfig(toggle_text,text='Not Armed')
         arm.itemconfig(armB,outline=red)
+        print("not armed")
 def set_speed(value):
         global speed
         speed = value
@@ -144,11 +158,34 @@ def open_speed_window():
     # Button to add custom speed
     add_button = tk.Button(speed_window, text="Add Custom Speed", command=add_custom_speed)
     add_button.pack(pady=5)
-def Thrust_Change(t):
+def Thrust_Title_Change(t):
     Label2.config(text=f'Thrust= {t} N')
+def move_cursor():
+    if not armed:
+        direction=[-1,1]
+        a=random.randint(50,200)*random.choice(direction)
+        b=random.randint(50,200)*random.choice(direction)
+        pyautogui.move(a,b,duration=0.105)
+def update_graph(thrust):
+    global t0
+    try:
+        y.append(float(thrust))
+        x.append(time.time() - t0)
+    except ValueError:
+        print(f"Skipping non-numeric value: {thrust}")
+
+    
+    # Plot the new data
+    axis.plot(x, y, linestyle="-", color="b", label="Thrust")
+    
+    # Dynamically adjust the y-axis limits
+    if y:  # Ensure there are valid y values to set limits
+        axis.set_ylim(min(y) - 1, max(y) + 1)  # Adjust the limits as needed
+    
+    # Redraw the canvas
+    fig1.draw()
 
 
-        
 # GUI WINDOW
 normal_color = "#5b3065" #border
 hover_color = "#ba5da3"
@@ -157,12 +194,65 @@ fill_color="#001122"
 red="#ff0000"
 green="#00ff00"
 root=tk.Tk()
-root.title("Controller")
+root.title("Thrust Bench")
 root.geometry('1280x720+200+10')
 root.resizable(False, False)
 root.config(bg='#dddddd')
 
 #root.iconbitmap(f"{currentDIR}/controller_assets/icon.ico")
+
+#Figures
+figure = Figure(figsize=(3, 2), dpi=200)
+figure.patch.set_facecolor("#001122")
+axis = figure.add_subplot(111)
+axis.set_title("Thrust figure")
+axis.set_xlabel("Time")
+axis.set_ylabel("Force")
+axis.set_facecolor("#ffffff")
+axis.tick_params(axis='x', colors='white')  # Change x-axis ticks color
+axis.tick_params(axis='y', colors='white')  # Change y-axis ticks color
+axis.set_title("Thrust", color='white')  # Change title color
+#axis.legend()
+x = []
+y = []
+fig1 = FigureCanvasTkAgg(figure, root)
+fig1.get_tk_widget().pack()
+fig1.get_tk_widget().place(x=500,y=150)
+axis.spines['left'].set_color('#ffffff')  # Change left spine color
+axis.spines['bottom'].set_color('#ffffff')  # Change bottom spine color
+axis.spines['right'].set_color('#ffffff')  # Change right spine color
+axis.spines['top'].set_color('#ffffff')  # Change top spine color
+
+
+
+#Title
+Label1=tk.Label(root,text='SSTL Thrust Test Platform',font="play 24 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
+Label1.pack()
+Label1.place(x=40,y=40)
+#Thrust
+Label2=tk.Label(root,text=f'Thrust = {Thrust_value} N',font="play 16 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
+Label2.pack()
+Label2.place(x=40,y=120)
+#Motor Speed
+Label3=tk.Label(root,text=f'Motor Speed = 0%',font="play 16 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
+Label3.pack()
+Label3.place(x=40,y=170)
+
+
+# Serial port picker
+port_frame=tk.Frame(root,bg='#dddddd')
+port_frame.pack()
+port_frame.place(y=575,x=1045)
+port_frame.bind("<Enter>",refreshSerialPorts)
+serial_title=tk.Label(port_frame,font=('Play',14),fg='#001122',bg="#dddddd",text="Serial Port :")
+serial_title.pack(side="left")
+n = tk.StringVar() 
+SerialPorts = ttk.Combobox(port_frame, width = 7, textvariable = n) 
+SerialPorts['values'] = (sp) 
+SerialPorts.pack(pady=15,padx=20,side=("right"))
+SerialPorts.current() 
+
+
 
 #Connect button
 connect = Canvas(root,width=320*0.75,height=75*0.75, bg="#dddddd",borderwidth=0,highlightthickness=0)
@@ -204,59 +294,9 @@ arm.place(x=775,y=620)
 arm.bind("<Button-1>", lambda event: change_color(arm,press_color))
 arm.bind("<ButtonRelease-1>", lambda event: arm_clicked())
 
-# Serial port picker
-port_frame=tk.Frame(root,bg='#dddddd')
-port_frame.pack()
-port_frame.place(y=575,x=1045)
-port_frame.bind("<Enter>",refreshSerialPorts)
-serial_title=tk.Label(port_frame,font=('Play',14),fg='#001122',bg="#dddddd",text="Serial Port :")
-serial_title.pack(side="left")
-n = tk.StringVar() 
-SerialPorts = ttk.Combobox(port_frame, width = 7, textvariable = n) 
-SerialPorts['values'] = (sp) 
-SerialPorts.pack(pady=15,padx=20,side=("right"))
-SerialPorts.current() 
-
-#Title
-Label1=tk.Label(root,text='SSTL Thrust Test Platform',font="play 18 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
-Label1.pack()
-Label1.place(x=40,y=40)
-#Thrust
-Label2=tk.Label(root,text=f'Thrust = {Thrust_value} N',font="play 48 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
-Label2.pack()
-Label2.place(x=450,y=350)
-#Motor Speed
-Label3=tk.Label(root,text=f'Motor Speed = 0%',font="play 48 bold",fg="#001122", bg="#dddddd",highlightthickness=0)
-Label3.pack()
-Label3.place(x=350,y=250)
 
 
-# Serial monitor
-sm_button = Canvas(root,width=320*0.75,height=75*0.75, bg="#dddddd",borderwidth=0,highlightthickness=0) #button
-smB = sm_button.create_polygon(
-p1,p2,p3,p4,p5,p6,p7,
-outline=normal_color, width=2,
-fill=fill_color
-)
-sm_button.create_text((160*0.75,40*0.75), text="Serial Monitor", font="Play 12 bold",fill="white")
-sm_button.place(x=30,y=620)
-sm_button.bind("<Enter>", lambda event: change_color(sm_button,hover_color))
-sm_button.bind("<Leave>", lambda event: change_color(sm_button,normal_color))
-sm_button.bind("<Button-1>", lambda event: change_color(sm_button,press_color))
-sm_button.bind("<ButtonRelease-1>", lambda event: SerialMonitor())
 
-serial_frame=Frame(width=1280,height=180)
-serial_frame.place(y=720)
-
-serial_monitor = scrolledtext.ScrolledText(serial_frame, 
-                            width = 114,  
-                            height = 7,  
-                            font = ("Arial", 
-                                    15)) 
-serial_monitor.pack(padx=4)
-serial_sender=tk.Entry(root,width=1280)
-serial_sender.pack(side='bottom')
-serial_sender.bind('<Return>',Send_text)
 
 
 # Speed Controller
@@ -290,9 +330,37 @@ fill=fill_color
 )
 toggle_text=start.create_text((160*0.75,40*0.75), text="Push Motor Speed", font="Play 12 bold",fill="white")
 start.place(x=280,y=620)
+
 start.bind("<Enter>", lambda event: change_color(start,hover_color))
+start.bind("<Enter>", lambda event: move_cursor())
 start.bind("<Leave>", lambda event: change_color(start,normal_color))
 start.bind("<Button-1>", lambda event: change_color(start,press_color))
 start.bind("<ButtonRelease-1>", lambda event: start_clicked())
+
+# Serial monitor
+sm_button = Canvas(root,width=320*0.75,height=75*0.75, bg="#dddddd",borderwidth=0,highlightthickness=0) #button
+smB = sm_button.create_polygon(
+p1,p2,p3,p4,p5,p6,p7,
+outline=normal_color, width=2,
+fill=fill_color
+)
+sm_button.create_text((160*0.75,40*0.75), text="Serial Monitor", font="Play 12 bold",fill="white")
+sm_button.place(x=30,y=620)
+sm_button.bind("<Enter>", lambda event: change_color(sm_button,hover_color))
+sm_button.bind("<Leave>", lambda event: change_color(sm_button,normal_color))
+sm_button.bind("<Button-1>", lambda event: change_color(sm_button,press_color))
+sm_button.bind("<ButtonRelease-1>", lambda event: SerialMonitor())
+
+serial_frame=Frame(width=1280,height=180)
+serial_frame.place(y=720)
+serial_monitor = scrolledtext.ScrolledText(serial_frame, 
+                            width = 114,  
+                            height = 7,  
+                            font = ("Arial", 
+                                    15)) 
+serial_monitor.pack(padx=4)
+serial_sender=tk.Entry(root,width=1280)
+serial_sender.pack(side='bottom')
+serial_sender.bind('<Return>',Send_text)
 
 root.mainloop()
